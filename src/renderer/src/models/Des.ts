@@ -1,4 +1,4 @@
-import { encode } from 'windows-1251'
+import { decode, encode } from 'windows-1251'
 
 export class Des {
   static outputRows: string[] = []
@@ -69,6 +69,18 @@ export class Des {
   /**
    * Преобразует строку в бинарный массив
    */
+  static xor(firstStr: string, secondStr: string): string {
+    let str = ''
+    for (let j = 0; j < firstStr.length; j++) {
+      str += (parseInt(firstStr[j]) ^ parseInt(secondStr[j])).toString()
+    }
+
+    return str
+  }
+
+  /**
+   * Преобразует строку в бинарный массив
+   */
   static stringToBinary(str: string, bitsCount: number = 8): string {
     let binary = ''
     for (let i = 0; i < str.length; i++) {
@@ -128,6 +140,7 @@ export class Des {
       const subKey = this.permute(combined, this.PC2)
       keys.push(subKey)
     }
+    console.log(keys)
 
     return keys
   }
@@ -140,10 +153,7 @@ export class Des {
     const expanded = this.permute(right, this.E)
 
     // XOR с ключом
-    let xored = ''
-    for (let i = 0; i < expanded.length; i++) {
-      xored += (parseInt(expanded[i]) ^ parseInt(key[i])).toString()
-    }
+    const xored = this.xor(expanded, key)
 
     // Применяем S-блоки (упрощенно)
     let substituted = ''
@@ -165,39 +175,63 @@ export class Des {
   static encryptBlock(block: string, keys: string[]): string {
     // Конвертируем блок в бинарную строку
     let blockBinary = this.stringToBinary(block, 8)
-
+    this.outputRows.push(
+      `Исходное сообщение: ${this.splitStringByLengthRegex(blockBinary, 8).join(' ')}`
+    )
     // Начальная перестановка
     blockBinary = this.permute(blockBinary, this.IP)
+    this.outputRows.push(
+      `Начальная перестановка IP: ${this.splitStringByLengthRegex(blockBinary, 8).join(' ')}`
+    )
 
     // Разделяем на левую и правую части
     let left = blockBinary.slice(0, 32)
     let right = blockBinary.slice(32)
+    this.outputRows.push(`H: ${this.splitStringByLengthRegex(left, 8).join(' ')}`)
+    this.outputRows.push(`L: ${this.splitStringByLengthRegex(right, 8).join(' ')}`)
 
     // 16 раундов сети Фейстеля
     for (let i = 0; i < 16; i++) {
+      const outputIndex = i + 1
+      this.outputRows.push(`Итерация ${outputIndex}`)
+      this.outputRows.push(`H${outputIndex}: ${this.splitStringByLengthRegex(left, 8).join(' ')}`)
+      this.outputRows.push(`L${outputIndex}: ${this.splitStringByLengthRegex(right, 8).join(' ')}`)
       const temp = right
       const feistelResult = this.feistelFunc(right, keys[i])
+      this.outputRows.push(
+        `f(L${outputIndex},k${outputIndex}): ${this.splitStringByLengthRegex(feistelResult, 8).join(' ')}`
+      )
 
       // XOR левой части с результатом функции Фейстеля
-      let newRight = ''
-      for (let j = 0; j < 32; j++) {
-        newRight += (parseInt(left[j]) ^ parseInt(feistelResult[j])).toString()
-      }
+      const newRight = this.xor(left, feistelResult)
+      this.outputRows.push(
+        `H${i + 1}⨁f${i + 1}: ${this.splitStringByLengthRegex(newRight, 8).join(' ')}`
+      )
 
       right = newRight
       left = temp
     }
 
+    this.outputRows.push(`H17: ${this.splitStringByLengthRegex(left, 8).join(' ')}`)
+    this.outputRows.push(`L17: ${this.splitStringByLengthRegex(right, 8).join(' ')}`)
+
     // Объединяем (после последнего раунда не меняем местами)
     const combined = right + left
+    this.outputRows.push(
+      `Сообщение после цикла преобразований: ${this.splitStringByLengthRegex(combined, 8).join(' ')}`
+    )
 
     // Финальная перестановка
     const encryptedBinary = this.permute(combined, this.FP)
+    this.outputRows.push(
+      `Конечная перестановка IP-1: ${this.splitStringByLengthRegex(encryptedBinary, 8).join(' ')}`
+    )
 
     // Конвертируем бинарную строку обратно в строку
     let encryptedText = ''
     for (let i = 0; i < 64; i += 8) {
       const byte = encryptedBinary.slice(i, i + 8)
+      // encryptedText += decode(byte)
       encryptedText += String.fromCharCode(parseInt(byte, 2))
     }
 
@@ -208,24 +242,28 @@ export class Des {
    * Шифрование в режиме ECB
    */
   static encryptECB(plaintext: string, key: string): string[] {
-    console.log('Исходный текст:', plaintext)
-    console.log('Ключ:', key)
+    this.outputRows = []
+    this.outputRows.push(`Исходный текст: ${plaintext}`)
 
     // Генерируем подключи
     const keys = this.generateKeys(key)
 
-    // Добавляем паддинг по PKCS#7
+    // Добавляем паддинг
     const blockSize = 8
     const padding = blockSize - (plaintext.length % blockSize)
-    const paddedText = plaintext + '0'.repeat(padding)
+    const paddedText = padding === 8 ? plaintext : plaintext + '0'.repeat(padding)
     this.outputRows.push(`Паддинг: ${paddedText}`)
 
     // Шифруем каждый блок
     let ciphertext = ''
     for (let i = 0; i < paddedText.length; i += blockSize) {
+      const outputIndex = i / 8 + 1
+      this.outputRows.push(`Блок ${outputIndex}`)
       const block = paddedText.slice(i, i + blockSize)
       ciphertext += this.encryptBlock(block, keys)
     }
+
+    this.outputRows.push(`${ciphertext}`)
 
     return this.outputRows
   }
@@ -233,14 +271,9 @@ export class Des {
   /**
    * Дешифрование в режиме ECB
    */
-  static decryptECB(ciphertext: string, key: string): string {
+  static decryptECB(ciphertext: string, key: string): string[] {
+    this.outputRows = []
     this.outputRows.push(`Исходное сообщение: ${ciphertext}`)
-    // Убедимся, что ключ имеет правильную длину
-    if (key.length < 8) {
-      key = key.padEnd(8, '\0')
-    } else if (key.length > 8) {
-      key = key.slice(0, 8)
-    }
 
     // Генерируем подключи в обратном порядке
     const keys = this.generateKeys(key).reverse()
@@ -254,6 +287,7 @@ export class Des {
 
     // Удаляем паддинг PKCS#7
     const padding = plaintext.charCodeAt(plaintext.length - 1)
-    return plaintext.slice(0, plaintext.length - padding)
+    return []
+    // return plaintext.slice(0, plaintext.length - padding)
   }
 }
