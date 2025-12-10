@@ -1,155 +1,180 @@
-import {
-  message as antDesign,
-  Button,
-  Card,
-  Row,
-  Col,
-  Input,
-  Select,
-  Space,
-  Typography
-} from 'antd'
-import { DefaultOptionType } from 'antd/es/select'
-import { ChangeEvent, useState } from 'react'
-import { Des } from '@renderer/models/Des'
-const { Paragraph } = Typography
+import React, { useMemo, useState } from 'react'
+import { Button, Card, Col, Form, Input, Row, Segmented, Select, Space } from 'antd'
+import { createLiteralArray } from '@renderer/utils'
+import { DesECB } from '@renderer/models/DesECB'
+import Paragraph from 'antd/es/typography/Paragraph'
 
-enum Encodings {
-  ECB = 'ECB',
-  CBC = 'CBC',
-  EEE3 = 'EEE3',
-  EDE3 = 'EDE3',
-  EEE2 = 'EEE2',
-  EDE2 = 'EDE2'
+const modeValues = createLiteralArray('DES-ECB', 'DES-CBC', 'EEE3', 'EDE3', 'EEE2', 'EDE2')
+type ModeValue = (typeof modeValues)[number]
+
+const actionValues = createLiteralArray('encrypt', 'decrypt')
+type ActionValue = (typeof actionValues)[number]
+
+interface FormFields {
+  mode: ModeValue
+  action: ActionValue
+  message: string
+  key1: string
+  key2: string
+  key3: string
+  ivKey: string
 }
 
-enum InputKeys {
-  Message = 'MESSAGE',
-  Key = 'KEY'
+const defaultValues: FormFields = {
+  mode: 'DES-ECB',
+  action: 'encrypt',
+  message: 'Щетинкин',
+  key1: '12345678',
+  key2: '87654321',
+  key3: 'qwertyui',
+  ivKey: 'iuytrewq'
 }
 
-enum SubmitActions {
-  Encrypt = 'ENCRYPT',
-  Decrypt = 'DECRYPT'
-}
+const App: React.FC = () => {
+  const [form] = Form.useForm<FormFields>()
+  const message = Form.useWatch('message', form)
+  const key1 = Form.useWatch('key1', form)
+  const key2 = Form.useWatch('key2', form)
+  const key3 = Form.useWatch('key3', form)
+  const ivKey = Form.useWatch('ivKey', form)
+  const mode = Form.useWatch('mode', form)
+  const action = Form.useWatch('action', form)
 
-function App(): React.JSX.Element {
-  const [messageApi, contextHolder] = antDesign.useMessage()
-  const [message, setMessage] = useState<string>('Щетинкин')
-  const [key, setKey] = useState<string>('12345678')
-  const [SelectValue, setSelectValue] = useState<Encodings>(Encodings.ECB)
   const [outputRows, setOutputRows] = useState<string[]>([])
 
-  const isValid = key.length === 8
+  const isIvKeyFieldShown = useMemo(() => mode === 'DES-CBC', [mode])
+  const isKey2FieldShown = useMemo(
+    () => mode === 'EEE3' || mode === 'EDE3' || mode === 'EEE2' || mode === 'EDE2',
+    [mode]
+  )
+  const isKey3FieldShown = useMemo(() => mode === 'EEE3' || mode === 'EDE3', [mode])
 
-  const onInputChange = (e: ChangeEvent<HTMLInputElement>, inputKey: InputKeys): void => {
-    switch (inputKey) {
-      case InputKeys.Message:
-        setMessage(e.target.value)
-        break
-      case InputKeys.Key:
-        setKey(e.target.value)
-        break
-      default:
-        break
-    }
-  }
-  const onSelectChange = (value: Encodings): void => {
-    setSelectValue(value)
-  }
-
-  const selectOptions: DefaultOptionType[] = [
-    { value: Encodings.ECB, label: 'DES-ECB' },
-    { value: Encodings.CBC, label: 'DES-CBC' },
-    { value: Encodings.EEE3, label: 'EEE3' },
-    { value: Encodings.EDE3, label: 'EDE3' },
-    { value: Encodings.EEE2, label: 'EEE2' },
-    { value: Encodings.EDE2, label: 'EDE2' }
-  ]
-
-  const onSubmit = (action: SubmitActions): void => {
-    if (!isValid) {
-      messageApi.open({
-        type: 'error',
-        content: 'Длина ключа должна составлять 8 символов!'
-      })
-      return
-    }
-
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = () => {
     switch (action) {
-      case SubmitActions.Encrypt:
-        setOutputRows([...Des.encryptECB(message, key)])
+      case 'encrypt':
+        setOutputRows([...DesECB.encrypt(message, key1)])
         break
-      case SubmitActions.Decrypt:
-        setOutputRows([...Des.decryptECB(message, key)])
+      case 'decrypt':
+        setOutputRows([...DesECB.decrypt(message, key1)])
         break
       default:
-        setOutputRows([])
         break
     }
   }
 
   return (
-    <>
-      {contextHolder}
-      <Row gutter={[16, 16]} justify="center" align="middle" style={{ maxWidth: 800 }}>
-        <Col span={24}>
-          <Space.Compact block>
-            <Select
-              size="large"
-              value={SelectValue}
-              onChange={onSelectChange}
-              options={selectOptions}
-              style={{ userSelect: 'none' }}
-            />
-            <Input
-              size="large"
-              placeholder="Исходное сообщение"
-              value={message}
-              onChange={(e) => onInputChange(e, InputKeys.Message)}
-            />
-            <Input
-              size="large"
-              placeholder="Ключ"
-              value={key}
-              onChange={(e) => onInputChange(e, InputKeys.Key)}
-              status={!isValid ? 'error' : ''}
-            />
-          </Space.Compact>
-        </Col>
-        <Col span="auto">
-          <Space.Compact>
-            <Button
-              size="large"
-              variant="outlined"
-              color="red"
-              onClick={() => onSubmit(SubmitActions.Decrypt)}
-              // disabled={!isValid}
+    <Row
+      gutter={20}
+      style={{
+        position: 'relative',
+        justifyContent: 'center',
+        alignItems: 'flex-start'
+      }}
+    >
+      <Col span={12} style={{ position: 'sticky', top: 50 }}>
+        <Card>
+          <Form
+            form={form}
+            variant="outlined"
+            layout="vertical"
+            initialValues={defaultValues}
+            onSubmitCapture={onSubmit}
+          >
+            <Form.Item label="Выберите алгоритм" name="mode">
+              <Segmented options={modeValues} />
+            </Form.Item>
+
+            <Form.Item
+              label="Сообщение"
+              name="message"
+              rules={[{ required: true, message: 'Заполните поле!' }]}
             >
-              Дешифровать
-            </Button>
-            <Button
-              size="large"
-              variant="solid"
-              color="primary"
-              onClick={() => onSubmit(SubmitActions.Encrypt)}
-              // disabled={!isValid}
+              <Input />
+            </Form.Item>
+
+            <Form.Item
+              label={mode === 'DES-CBC' || mode === 'DES-ECB' ? 'Ключ' : 'Ключ 1'}
+              name="key1"
+              rules={[
+                { required: true, message: 'Заполните поле!' },
+                { len: 8, message: 'Длина ключа 8 символов!' }
+              ]}
             >
-              Шифровать
-            </Button>
-          </Space.Compact>
-        </Col>
-        <Col span={24}>
+              <Input />
+            </Form.Item>
+
+            {isIvKeyFieldShown && (
+              <Form.Item
+                label="Начальный вектор"
+                name="ivKey"
+                rules={[
+                  { required: true, message: 'Заполните поле!' },
+                  { len: 8, message: 'Длина ключа 8 символов!' }
+                ]}
+              >
+                <Input />
+              </Form.Item>
+            )}
+
+            {isKey2FieldShown && (
+              <Form.Item
+                label="Ключ 2"
+                name="key2"
+                rules={[
+                  { required: true, message: 'Заполните поле!' },
+                  { len: 8, message: 'Длина ключа 8 символов!' }
+                ]}
+              >
+                <Input />
+              </Form.Item>
+            )}
+
+            {isKey3FieldShown && (
+              <Form.Item
+                label="Ключ 3"
+                name="key3"
+                rules={[
+                  { required: true, message: 'Заполните поле!' },
+                  { len: 8, message: 'Длина ключа 8 символов!' }
+                ]}
+              >
+                <Input />
+              </Form.Item>
+            )}
+
+            <Space.Compact block>
+              <Form.Item name="action" label={null} style={{ flex: '1 0 auto' }}>
+                <Select
+                  options={[
+                    { value: 'encrypt', label: 'Шифрование' },
+                    { value: 'decrypt', label: 'Дешифрование' }
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item label={null}>
+                <Button type="primary" htmlType="submit">
+                  Выполнить
+                </Button>
+              </Form.Item>
+            </Space.Compact>
+          </Form>
+        </Card>
+      </Col>
+      {!!outputRows.length && (
+        <Col span={12} style={{ height: '100%' }}>
           <Card
-            styles={{ root: { overflow: 'hidden' }, body: { height: 300, overflowY: 'scroll' } }}
+            styles={{
+              root: { overflow: 'hidden', height: '100%' },
+              body: { height: '100%', overflowY: 'auto' }
+            }}
           >
             {outputRows.map((item, i) => (
               <Paragraph key={`${i}-${item}`}>{item}</Paragraph>
             ))}
           </Card>
         </Col>
-      </Row>
-    </>
+      )}
+    </Row>
   )
 }
 

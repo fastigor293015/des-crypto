@@ -26,6 +26,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
   min-height: 100vh;
   padding: 50px 25px;
   color: var(--color-text);
@@ -53,8 +54,7 @@ body {
 }
 
 #root {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
+  flex: 0 0 min-content;
+  width: 100%;
+  max-width: 1000px;
 }
