@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Button, Card, Col, Form, Input, Row, Segmented, Select, Space } from 'antd'
 import { createLiteralArray } from '@renderer/utils'
-import { DesECB } from '@renderer/models/DesECB'
+import { Des } from '@renderer/models/Des'
 import Paragraph from 'antd/es/typography/Paragraph'
 
 const modeValues = createLiteralArray('DES-ECB', 'DES-CBC', 'EEE3', 'EDE3', 'EEE2', 'EDE2')
@@ -50,13 +50,80 @@ const App: React.FC = () => {
   const isKey3FieldShown = useMemo(() => mode === 'EEE3' || mode === 'EDE3', [mode])
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = () => {
-    switch (action) {
-      case 'encrypt':
-        setOutputRows([...DesECB.encrypt(message, key1)])
+    switch (mode) {
+      case 'DES-ECB':
+        switch (action) {
+          case 'encrypt':
+            setOutputRows([...Des.encryptECB(message, key1)])
+            break
+          case 'decrypt':
+            setOutputRows([...Des.decryptECB(message, key1)])
+            break
+          default:
+            break
+        }
         break
-      case 'decrypt':
-        setOutputRows([...DesECB.decrypt(message, key1)])
+      case 'DES-CBC':
+        switch (action) {
+          case 'encrypt':
+            setOutputRows([...Des.encryptCBC(message, key1, ivKey)])
+            break
+          case 'decrypt':
+            setOutputRows([...Des.decryptCBC(message, key1, ivKey)])
+            break
+          default:
+            break
+        }
         break
+      case 'EEE3':
+        switch (action) {
+          case 'encrypt':
+            setOutputRows([...Des.encryptEEE3(message, key1, key2, key3)])
+            break
+          case 'decrypt':
+            setOutputRows([...Des.decryptEEE3(message, key1, key2, key3)])
+            break
+          default:
+            break
+        }
+        break
+      case 'EDE3':
+        switch (action) {
+          case 'encrypt':
+            setOutputRows([...Des.encryptEDE3(message, key1, key2, key3)])
+            break
+          case 'decrypt':
+            setOutputRows([...Des.decryptEDE3(message, key1, key2, key3)])
+            break
+          default:
+            break
+        }
+        break
+      case 'EEE2':
+        switch (action) {
+          case 'encrypt':
+            setOutputRows([...Des.encryptEEE2(message, key1, key2)])
+            break
+          case 'decrypt':
+            setOutputRows([...Des.decryptEEE2(message, key1, key2)])
+            break
+          default:
+            break
+        }
+        break
+      case 'EDE2':
+        switch (action) {
+          case 'encrypt':
+            setOutputRows([...Des.encryptEDE2(message, key1, key2)])
+            break
+          case 'decrypt':
+            setOutputRows([...Des.decryptEDE2(message, key1, key2)])
+            break
+          default:
+            break
+        }
+        break
+
       default:
         break
     }
