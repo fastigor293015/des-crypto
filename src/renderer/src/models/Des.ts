@@ -307,35 +307,39 @@ export class Des {
     key: string,
     returnMessage: boolean = false
   ): string[] | string {
-    if (!returnMessage) {
-      this.clearOutputRows()
+    try {
+      if (!returnMessage) {
+        this.clearOutputRows()
+      }
+      this.outputRows.push('Шифрование:')
+      this.outputRows.push(`Исходный текст: ${plaintext}`)
+
+      // Добавляем паддинг PKCS#7
+      const blockSize = 8
+      const padding = blockSize - (plaintext.length % blockSize)
+      const paddedText = padding === 8 ? plaintext : plaintext + padding.toString().repeat(padding)
+      if (padding !== 8) {
+        this.outputRows.push(`С паддингом: ${paddedText}`)
+      }
+
+      // Генерируем подключи
+      const keys = this.generateKeys(key)
+
+      // Шифруем каждый блок
+      let ciphertext = ''
+      for (let i = 0; i < paddedText.length; i += blockSize) {
+        const outputIndex = i / 8 + 1
+        this.outputRows.push(`Блок ${outputIndex}`)
+        const block = paddedText.slice(i, i + blockSize)
+        ciphertext += this.encryptBlock(block, keys)
+      }
+
+      this.outputRows.push(`Зашифрованное сообщение: ${ciphertext}`)
+
+      return returnMessage ? ciphertext : this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
     }
-    this.outputRows.push('Шифрование:')
-    this.outputRows.push(`Исходный текст: ${plaintext}`)
-
-    // Добавляем паддинг PKCS#7
-    const blockSize = 8
-    const padding = blockSize - (plaintext.length % blockSize)
-    const paddedText = padding === 8 ? plaintext : plaintext + padding.toString().repeat(padding)
-    if (padding !== 8) {
-      this.outputRows.push(`С паддингом: ${paddedText}`)
-    }
-
-    // Генерируем подключи
-    const keys = this.generateKeys(key)
-
-    // Шифруем каждый блок
-    let ciphertext = ''
-    for (let i = 0; i < paddedText.length; i += blockSize) {
-      const outputIndex = i / 8 + 1
-      this.outputRows.push(`Блок ${outputIndex}`)
-      const block = paddedText.slice(i, i + blockSize)
-      ciphertext += this.encryptBlock(block, keys)
-    }
-
-    this.outputRows.push(`Зашифрованное сообщение: ${ciphertext}`)
-
-    return returnMessage ? ciphertext : this.outputRows
   }
 
   /**
@@ -346,242 +350,286 @@ export class Des {
     key: string,
     returnMessage: boolean = false
   ): string[] | string {
-    if (!returnMessage) {
-      this.clearOutputRows()
-    }
-    this.outputRows.push('Дешифрование:')
-    this.outputRows.push(`Исходное сообщение: ${ciphertext}`)
+    try {
+      if (!returnMessage) {
+        this.clearOutputRows()
+      }
+      this.outputRows.push('Дешифрование:')
+      this.outputRows.push(`Исходное сообщение: ${ciphertext}`)
 
-    // Генерируем подключи в обратном порядке
-    const keys = this.generateKeys(key).reverse()
+      // Генерируем подключи в обратном порядке
+      const keys = this.generateKeys(key).reverse()
 
-    // Дешифруем каждый блок
-    let plaintext = ''
-    for (let i = 0; i < ciphertext.length; i += 8) {
-      const block = ciphertext.slice(i, i + 8)
-      plaintext += this.encryptBlock(block, keys)
-    }
+      // Дешифруем каждый блок
+      let plaintext = ''
+      for (let i = 0; i < ciphertext.length; i += 8) {
+        const block = ciphertext.slice(i, i + 8)
+        plaintext += this.encryptBlock(block, keys)
+      }
 
-    // Удаляем паддинг PKCS#7
-    const padding = parseInt(plaintext[plaintext.length - 1])
-    if (padding >= 1 && padding <= 7) {
-      plaintext = plaintext.slice(0, plaintext.length - padding)
+      // Удаляем паддинг PKCS#7
+      const padding = parseInt(plaintext[plaintext.length - 1])
+      if (padding >= 1 && padding <= 7) {
+        plaintext = plaintext.slice(0, plaintext.length - padding)
+      }
+      this.outputRows.push(`Расшифрованное сообщение: ${plaintext}`)
+      return returnMessage ? plaintext : this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
     }
-    this.outputRows.push(`Расшифрованное сообщение: ${plaintext}`)
-    return returnMessage ? plaintext : this.outputRows
   }
 
   /**
    * Шифрование в режиме CBC
    */
   static encryptCBC(plaintext: string, key: string, ivKey: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шифрование:')
-    this.outputRows.push(`Исходный текст: ${plaintext}`)
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шифрование:')
+      this.outputRows.push(`Исходный текст: ${plaintext}`)
 
-    // Добавляем паддинг PKCS#7
-    const blockSize = 8
-    const padding = blockSize - (plaintext.length % blockSize)
-    const paddedText = padding === 8 ? plaintext : plaintext + padding.toString().repeat(padding)
-    if (padding !== 8) {
-      this.outputRows.push(`С паддингом: ${paddedText}`)
+      // Добавляем паддинг PKCS#7
+      const blockSize = 8
+      const padding = blockSize - (plaintext.length % blockSize)
+      const paddedText = padding === 8 ? plaintext : plaintext + padding.toString().repeat(padding)
+      if (padding !== 8) {
+        this.outputRows.push(`С паддингом: ${paddedText}`)
+      }
+
+      // Генерируем подключи
+      const keys = this.generateKeys(key)
+
+      // Шифруем каждый блок
+      let ciphertext = ''
+      let ivKeyBuffer = ivKey
+      for (let i = 0; i < paddedText.length; i += blockSize) {
+        const outputIndex = i / 8 + 1
+        const block = paddedText.slice(i, i + blockSize)
+        const summary = this.xor(this.stringToBinary(ivKeyBuffer, 8), this.stringToBinary(block, 8))
+        this.outputRows.push(
+          `C${outputIndex - 1}: ${this.splitStringByLengthRegex(this.stringToBinary(ivKeyBuffer, 8), 8).join(' ')}`
+        )
+        this.outputRows.push(
+          `T${outputIndex}: ${this.splitStringByLengthRegex(this.stringToBinary(block, 8), 8).join(' ')}`
+        )
+        this.outputRows.push(
+          `C${outputIndex - 1}⨁T${outputIndex}: ${this.splitStringByLengthRegex(summary, 8).join(' ')}`
+        )
+        this.outputRows.push(`Блок ${outputIndex}`)
+        const encryptedBlock = this.encryptBlock(this.binaryToString(summary, 8), keys)
+        ciphertext += encryptedBlock
+        ivKeyBuffer = encryptedBlock
+      }
+
+      this.outputRows.push(`Зашифрованное сообщение: ${ciphertext}`)
+
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
     }
-
-    // Генерируем подключи
-    const keys = this.generateKeys(key)
-
-    // Шифруем каждый блок
-    let ciphertext = ''
-    let ivKeyBuffer = ivKey
-    for (let i = 0; i < paddedText.length; i += blockSize) {
-      const outputIndex = i / 8 + 1
-      const block = paddedText.slice(i, i + blockSize)
-      const summary = this.xor(this.stringToBinary(ivKeyBuffer, 8), this.stringToBinary(block, 8))
-      this.outputRows.push(
-        `C${outputIndex - 1}: ${this.splitStringByLengthRegex(this.stringToBinary(ivKeyBuffer, 8), 8).join(' ')}`
-      )
-      this.outputRows.push(
-        `T${outputIndex}: ${this.splitStringByLengthRegex(this.stringToBinary(block, 8), 8).join(' ')}`
-      )
-      this.outputRows.push(
-        `C${outputIndex - 1}⨁T${outputIndex}: ${this.splitStringByLengthRegex(summary, 8).join(' ')}`
-      )
-      this.outputRows.push(`Блок ${outputIndex}`)
-      const encryptedBlock = this.encryptBlock(this.binaryToString(summary, 8), keys)
-      ciphertext += encryptedBlock
-      ivKeyBuffer = encryptedBlock
-    }
-
-    this.outputRows.push(`Зашифрованное сообщение: ${ciphertext}`)
-
-    return this.outputRows
   }
 
   /**
    * Дешифрование в режиме CBC
    */
   static decryptCBC(ciphertext: string, key: string, ivKey: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Дешифрование:')
-    this.outputRows.push(`Исходное сообщение: ${ciphertext}`)
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Дешифрование:')
+      this.outputRows.push(`Исходное сообщение: ${ciphertext}`)
 
-    // Генерируем подключи в обратном порядке
-    const keys = this.generateKeys(key).reverse()
+      // Генерируем подключи в обратном порядке
+      const keys = this.generateKeys(key).reverse()
 
-    // Дешифруем каждый блок
-    let plaintext = ''
-    let ivKeyBuffer = ivKey
-    for (let i = 0; i < ciphertext.length; i += 8) {
-      const outputIndex = i / 8 + 1
-      const block = ciphertext.slice(i, i + 8)
-      this.outputRows.push(
-        `C${outputIndex - 1}: ${this.splitStringByLengthRegex(this.stringToBinary(ivKeyBuffer, 8), 8).join(' ')}`
-      )
-      this.outputRows.push(
-        `C${outputIndex}: ${this.splitStringByLengthRegex(this.stringToBinary(block, 8), 8).join(' ')}`
-      )
-      this.outputRows.push(`Блок ${outputIndex}`)
-      const decryptedBlock = this.encryptBlock(block, keys)
-      const summary = this.xor(
-        this.stringToBinary(ivKeyBuffer, 8),
-        this.stringToBinary(decryptedBlock, 8)
-      )
-      this.outputRows.push(
-        `DES-ECB(C${outputIndex}): ${this.splitStringByLengthRegex(this.stringToBinary(decryptedBlock, 8), 8).join(' ')}`
-      )
-      this.outputRows.push(
-        `C${outputIndex - 1}⨁DES-ECB(C${outputIndex}): ${this.splitStringByLengthRegex(summary, 8).join(' ')}`
-      )
-      plaintext += this.binaryToString(summary, 8)
-      ivKeyBuffer = block
+      // Дешифруем каждый блок
+      let plaintext = ''
+      let ivKeyBuffer = ivKey
+      for (let i = 0; i < ciphertext.length; i += 8) {
+        const outputIndex = i / 8 + 1
+        const block = ciphertext.slice(i, i + 8)
+        this.outputRows.push(
+          `C${outputIndex - 1}: ${this.splitStringByLengthRegex(this.stringToBinary(ivKeyBuffer, 8), 8).join(' ')}`
+        )
+        this.outputRows.push(
+          `C${outputIndex}: ${this.splitStringByLengthRegex(this.stringToBinary(block, 8), 8).join(' ')}`
+        )
+        this.outputRows.push(`Блок ${outputIndex}`)
+        const decryptedBlock = this.encryptBlock(block, keys)
+        const summary = this.xor(
+          this.stringToBinary(ivKeyBuffer, 8),
+          this.stringToBinary(decryptedBlock, 8)
+        )
+        this.outputRows.push(
+          `DES-ECB(C${outputIndex}): ${this.splitStringByLengthRegex(this.stringToBinary(decryptedBlock, 8), 8).join(' ')}`
+        )
+        this.outputRows.push(
+          `C${outputIndex - 1}⨁DES-ECB(C${outputIndex}): ${this.splitStringByLengthRegex(summary, 8).join(' ')}`
+        )
+        plaintext += this.binaryToString(summary, 8)
+        ivKeyBuffer = block
+      }
+
+      // Удаляем паддинг PKCS#7
+      const padding = parseInt(plaintext[plaintext.length - 1])
+      if (padding >= 1 && padding <= 7) {
+        plaintext = plaintext.slice(0, plaintext.length - padding)
+      }
+      this.outputRows.push(`Расшифрованное сообщение: ${plaintext}`)
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
     }
-
-    // Удаляем паддинг PKCS#7
-    const padding = parseInt(plaintext[plaintext.length - 1])
-    if (padding >= 1 && padding <= 7) {
-      plaintext = plaintext.slice(0, plaintext.length - padding)
-    }
-    this.outputRows.push(`Расшифрованное сообщение: ${plaintext}`)
-    return this.outputRows
   }
 
   /**
    * Шифрование в режиме EEE3
    */
   static encryptEEE3(plaintext: string, key1: string, key2: string, key3: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.encryptECB(plaintext, key1, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.encryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.encryptECB(message, key3, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.encryptECB(plaintext, key1, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.encryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.encryptECB(message, key3, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 
   /**
    * Дешифрование в режиме EEE3
    */
   static decryptEEE3(ciphertext: string, key1: string, key2: string, key3: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.decryptECB(ciphertext, key3, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.decryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.decryptECB(message, key1, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.decryptECB(ciphertext, key3, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.decryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.decryptECB(message, key1, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 
   /**
    * Шифрование в режиме EDE3
    */
   static encryptEDE3(plaintext: string, key1: string, key2: string, key3: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.encryptECB(plaintext, key1, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.decryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.encryptECB(message, key3, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.encryptECB(plaintext, key1, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.decryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.encryptECB(message, key3, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 
   /**
    * Дешифрование в режиме EDE3
    */
   static decryptEDE3(ciphertext: string, key1: string, key2: string, key3: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.decryptECB(ciphertext, key3, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.encryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.decryptECB(message, key1, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.decryptECB(ciphertext, key3, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.encryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.decryptECB(message, key1, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 
   /**
    * Шифрование в режиме EEE2
    */
   static encryptEEE2(plaintext: string, key1: string, key2: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.encryptECB(plaintext, key1, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.encryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.encryptECB(message, key1, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.encryptECB(plaintext, key1, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.encryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.encryptECB(message, key1, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 
   /**
    * Дешифрование в режиме EEE2
    */
   static decryptEEE2(ciphertext: string, key1: string, key2: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.decryptECB(ciphertext, key1, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.decryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.decryptECB(message, key1, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.decryptECB(ciphertext, key1, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.decryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.decryptECB(message, key1, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 
   /**
    * Шифрование в режиме EDE2
    */
   static encryptEDE2(plaintext: string, key1: string, key2: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.encryptECB(plaintext, key1, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.decryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.encryptECB(message, key1, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.encryptECB(plaintext, key1, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.decryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.encryptECB(message, key1, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 
   /**
    * Дешифрование в режиме EDE2
    */
   static decryptEDE2(ciphertext: string, key1: string, key2: string): string[] {
-    this.clearOutputRows()
-    this.outputRows.push('Шаг 1:')
-    let message = this.decryptECB(ciphertext, key1, true) as string
-    this.outputRows.push('Шаг 2:')
-    message = this.encryptECB(message, key2, true) as string
-    this.outputRows.push('Шаг 3:')
-    this.decryptECB(message, key1, true) as string
+    try {
+      this.clearOutputRows()
+      this.outputRows.push('Шаг 1:')
+      let message = this.decryptECB(ciphertext, key1, true) as string
+      this.outputRows.push('Шаг 2:')
+      message = this.encryptECB(message, key2, true) as string
+      this.outputRows.push('Шаг 3:')
+      this.decryptECB(message, key1, true) as string
 
-    return this.outputRows
+      return this.outputRows
+    } catch {
+      throw new Error('Что-то пошло не так...')
+    }
   }
 }
